@@ -594,10 +594,28 @@ func (s *Scheduler) addToNewNodeClaim(ctx context.Context, pod *corev1.Pod) erro
 		mu.Lock()
 		defer mu.Unlock()
 
+		// loft-sh: we change the logic here to not break the loop as soon as we find a solvable nodeclaim and instead
+		// not only look at the weight of the nodepools but instead also at the instance type prices to select the right
+		// nodepool to schedule on. If weight on nodepools is defined we use that instead so our logic only applies if all
+		// nodepools have the same weight.
+		sortByPrice := false
+		if len(updatedInstanceTypes) > 0 && s.nodeClaimTemplates[i].NodePoolWeight == s.nodeClaimTemplates[idx].NodePoolWeight {
+			currentMinPrice := getMinPrice(updatedInstanceTypes)
+			newMinPrice := getMinPrice(its)
+			// if equal we still sort by order and do nothing
+			// if currentMinPrice < newMinPrice we just return
+			// if currentMinPrice > newMinPrice we set sortByPrice to true
+			if currentMinPrice < newMinPrice {
+				return true
+			} else if currentMinPrice > newMinPrice {
+				sortByPrice = true
+			}
+		}
+
 		// Ensure that we always take an earlier successful schedule to keep consistent ordering
 		// We care about this particularly with NewNodeClaims because NodeClaims should be evaluated by weight
-		if i >= idx {
-			return false
+		if !sortByPrice && i >= idx {
+			return true
 		}
 
 		_, minValuesRelaxed := lo.Find(nodeClaim.Requirements.Keys().UnsortedList(), func(k string) bool {
@@ -616,7 +634,7 @@ func (s *Scheduler) addToNewNodeClaim(ctx context.Context, pod *corev1.Pod) erro
 		updatedInstanceTypes = its
 		offeringsToReserve = ofs
 		idx = i
-		return false
+		return true
 	})
 	if newNodeClaim != nil {
 		// we will launch this nodeClaim and need to track its maximum possible resource usage against our remaining resources
@@ -626,6 +644,16 @@ func (s *Scheduler) addToNewNodeClaim(ctx context.Context, pod *corev1.Pod) erro
 		return nil
 	}
 	return multierr.Combine(errs...)
+}
+
+func getMinPrice(its []*cloudprovider.InstanceType) float64 {
+	minPrice := math.MaxFloat64
+	for _, it := range its {
+		for _, of := range it.Offerings {
+			minPrice = math.Min(minPrice, of.Price)
+		}
+	}
+	return minPrice
 }
 
 func (s *Scheduler) calculateExistingNodeClaims(stateNodes []*state.StateNode, daemonSetPods []*corev1.Pod) {
