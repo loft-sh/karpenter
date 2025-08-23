@@ -163,8 +163,13 @@ type CompatibilityOptions struct {
 	AllowUndefined sets.Set[string]
 }
 
+// loft-sh: we need to be able to override the well known labels dynamically here
+var GetAllowedUndefinedWellKnownLabels = func() sets.Set[string] {
+	return v1.WellKnownLabels
+}
+
 var AllowUndefinedWellKnownLabels = func(options *CompatibilityOptions) {
-	options.AllowUndefined = v1.WellKnownLabels
+	options.AllowUndefined = GetAllowedUndefinedWellKnownLabels()
 }
 
 func (r Requirements) IsCompatible(requirements Requirements, options ...option.Function[CompatibilityOptions]) bool {
