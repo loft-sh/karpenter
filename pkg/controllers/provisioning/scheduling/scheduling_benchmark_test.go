@@ -251,7 +251,7 @@ func setupScheduler(ctx context.Context, pods []*corev1.Pod, opts ...scheduling.
 		events.NewRecorder(&record.FakeRecorder{}),
 		clock,
 		opts...,
-	), nil
+	)
 }
 
 func makeDiversePods(count int) []*corev1.Pod {
