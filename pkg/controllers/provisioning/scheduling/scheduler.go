@@ -126,7 +126,7 @@ func NewScheduler(
 	clock clock.Clock,
 	volumeReqsByPod map[types.UID]scheduling.Requirements,
 	opts ...Options,
-) *Scheduler {
+) (*Scheduler, error) {
 	minValuesPolicy := option.Resolve(opts...).minValuesPolicy
 
 	// if any of the nodePools add a taint with a prefer no schedule effect, we add a toleration for the taint
@@ -157,6 +157,9 @@ func NewScheduler(
 		}
 		return nct, true
 	})
+	if len(templates) == 0 {
+		return nil, fmt.Errorf("nodepool requirements filtered out all instance types for all node pools")
+	}
 	s := &Scheduler{
 		uuid:                uuid.NewUUID(),
 		kubeClient:          kubeClient,
@@ -180,7 +183,7 @@ func NewScheduler(
 		numConcurrentReconciles: lo.Ternary(option.Resolve(opts...).numConcurrentReconciles > 0, option.Resolve(opts...).numConcurrentReconciles, 1),
 	}
 	s.calculateExistingNodeClaims(ctx, stateNodes, daemonSetPods)
-	return s
+	return s, nil
 }
 
 type PodData struct {

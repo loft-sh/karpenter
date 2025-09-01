@@ -252,7 +252,7 @@ func setupScheduler(ctx context.Context, pods []*corev1.Pod, opts ...scheduling.
 		clock,
 		nil, // volumeReqsByPod
 		opts...,
-	), nil
+	)
 }
 
 func makeDiversePods(count int) []*corev1.Pod {

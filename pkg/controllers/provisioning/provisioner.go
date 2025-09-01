@@ -303,7 +303,7 @@ func (p *Provisioner) NewScheduler(
 		return nil, fmt.Errorf("getting daemon pods, %w", err)
 	}
 	// Pass volumeReqs to scheduler - added to nodeRequirements for NodeClaim zone selection
-	return scheduler.NewScheduler(ctx, p.kubeClient, nodePools, p.cluster, stateNodes, topology, instanceTypes, daemonSetPods, p.recorder, p.clock, volumeReqs, opts...), nil
+	return scheduler.NewScheduler(ctx, p.kubeClient, nodePools, p.cluster, stateNodes, topology, instanceTypes, daemonSetPods, p.recorder, p.clock, volumeReqs, opts...)
 }
 
 func (p *Provisioner) Schedule(ctx context.Context) (scheduler.Results, error) {
