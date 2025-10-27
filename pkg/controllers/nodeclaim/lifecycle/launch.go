@@ -127,8 +127,8 @@ func PopulateNodeClaimDetails(nodeClaim, retrieved *v1.NodeClaim) *v1.NodeClaim 
 	// These are ordered in priority order so that user-defined nodeClaim labels and requirements trump retrieved labels
 	// or the static nodeClaim labels
 	nodeClaim.Labels = lo.Assign(
-		retrieved.Labels, // CloudProvider-resolved labels
 		scheduling.NewNodeSelectorRequirementsWithMinValues(nodeClaim.Spec.Requirements...).Labels(), // Single-value requirement resolved labels
+		retrieved.Labels, // CloudProvider-resolved labels
 		nodeClaim.Labels, // User-defined labels
 	)
 	nodeClaim.Annotations = lo.Assign(nodeClaim.Annotations, retrieved.Annotations)
