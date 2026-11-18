@@ -136,6 +136,10 @@ type StateNode struct {
 	// of the karpenter.sh/disruption taint to know when a node is marked for deletion.
 	markedForDeletion bool
 	nominatedUntil    metav1.Time
+
+	// loft-sh: heldUntil is when the hold for an in-place repair of the node ends, see Held()
+	heldUntil metav1.Time
+	clock     nodeClock
 }
 
 func NewNode() *StateNode {
@@ -161,6 +165,8 @@ func (in *StateNode) ShallowCopy() *StateNode {
 		volumeUsage:       in.volumeUsage,
 		markedForDeletion: in.markedForDeletion,
 		nominatedUntil:    in.nominatedUntil,
+		heldUntil:         in.heldUntil,
+		clock:             in.clock,
 	}
 }
 
@@ -219,6 +225,10 @@ func (in *StateNode) ValidateNodeDisruptable(clk clock.Clock) error {
 	}
 	if in.Annotations()[v1.DoNotDisruptAnnotationKey] == "true" {
 		return fmt.Errorf("disruption is blocked through the %q annotation", v1.DoNotDisruptAnnotationKey)
+	}
+	// loft-sh: a node that is being repaired in place is expected back, so don't reclaim it while it is drained
+	if in.Held() {
+		return fmt.Errorf("node is held while it is being repaired in place")
 	}
 	// check whether the node has the NodePool label
 	if _, ok := in.Labels()[v1.NodePoolLabelKey]; !ok {
@@ -306,6 +316,10 @@ func (in *StateNode) Taints() []corev1.Taint {
 	var taints []corev1.Taint
 	if (!in.Registered() && in.Managed()) || in.Node == nil {
 		taints = in.NodeClaim.Spec.Taints
+	} else if in.Held() {
+		// loft-sh: a held node is cordoned and may be NotReady, but it is expected back. Use the taints that it will
+		// have once it is back, so that pending pods are counted against it and don't trigger new capacity.
+		return in.NodeClaim.Spec.Taints
 	} else {
 		taints = in.Node.Spec.Taints
 	}
@@ -350,7 +364,8 @@ func (in *StateNode) Initialized() bool {
 }
 
 func (in *StateNode) Capacity() corev1.ResourceList {
-	if !in.Initialized() && in.NodeClaim != nil {
+	// loft-sh: a held node can report zero for resources that come back late after a reboot (e.g. GPUs)
+	if (!in.Initialized() || in.Held()) && in.NodeClaim != nil {
 		// Override any zero quantity values in the node status
 		if in.Node != nil {
 			ret := lo.Assign(in.Node.Status.Capacity)
@@ -367,7 +382,8 @@ func (in *StateNode) Capacity() corev1.ResourceList {
 }
 
 func (in *StateNode) Allocatable() corev1.ResourceList {
-	if !in.Initialized() && in.NodeClaim != nil {
+	// loft-sh: a held node can report zero for resources that come back late after a reboot (e.g. GPUs)
+	if (!in.Initialized() || in.Held()) && in.NodeClaim != nil {
 		// Override any zero quantity values in the node status
 		if in.Node != nil {
 			ret := lo.Assign(in.Node.Status.Allocatable)

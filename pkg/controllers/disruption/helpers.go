@@ -137,6 +137,15 @@ func SimulateScheduling(ctx context.Context, kubeClient client.Client, cluster *
 				}
 			}
 		}
+		// loft-sh: a held node counts as capacity for pods that are already pending, but we don't know when it is back.
+		// Don't disrupt other nodes on the assumption that their pods can move to it.
+		if n.Held() {
+			for _, p := range n.Pods {
+				if _, ok := deletingNodePodKeys[client.ObjectKeyFromObject(p)]; !ok {
+					results.PodErrors[p] = fmt.Errorf("would schedule against node/%s, which is held while it is being repaired in place", n.Node.Name)
+				}
+			}
+		}
 	}
 	return results, nil
 }

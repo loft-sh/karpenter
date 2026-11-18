@@ -89,6 +89,9 @@ type Options struct {
 	MinValuesPolicy                  MinValuesPolicy
 	IgnoreDRARequests                bool // NOTE: This flag will be removed once formal DRA support is GA in Karpenter.
 	FeatureGates                     FeatureGates
+	// loft-sh: nodes that carry the NodeHoldLabelKey label are held for at most NodeHoldDuration, see StateNode.Held()
+	NodeHoldLabelKey string
+	NodeHoldDuration time.Duration
 }
 
 type FlagSet struct {
@@ -130,6 +133,8 @@ func (o *Options) AddFlags(fs *FlagSet) {
 	fs.StringVar(&o.preferencePolicyRaw, "preference-policy", env.WithDefaultString("PREFERENCE_POLICY", string(PreferencePolicyRespect)), "How the Karpenter scheduler should treat preferences. Preferences include preferredDuringSchedulingIgnoreDuringExecution node and pod affinities/anti-affinities and ScheduleAnyways topologySpreadConstraints. Can be one of 'Ignore' and 'Respect'")
 	fs.StringVar(&o.minValuesPolicyRaw, "min-values-policy", env.WithDefaultString("MIN_VALUES_POLICY", string(MinValuesPolicyStrict)), "Min values policy for scheduling. Options include 'Strict' for existing behavior where min values are strictly enforced or 'BestEffort' where Karpenter relaxes min values when it isn't satisfied.")
 	fs.BoolVarWithEnv(&o.IgnoreDRARequests, "ignore-dra-requests", "IGNORE_DRA_REQUESTS", true, "When set, Karpenter will ignore pods' DRA requests during scheduling simulations. NOTE: This flag will be removed once formal DRA support is GA in Karpenter.")
+	fs.StringVar(&o.NodeHoldLabelKey, "node-hold-label-key", env.WithDefaultString("NODE_HOLD_LABEL_KEY", ""), "Label key that an external system keeps on a node while it repairs the node in place. While a node has this label, Karpenter does not disrupt it and still counts it as capacity for pending pods, even if it is cordoned or not ready. The label value is ignored. Nodes are never held if this is empty.")
+	fs.DurationVar(&o.NodeHoldDuration, "node-hold-duration", env.WithDefaultDuration("NODE_HOLD_DURATION", 30*time.Minute), "The maximum time a node is held, counted from when the node-hold-label-key label was first seen on it. After that the node is treated like any other node, even if it still has the label.")
 	fs.StringVar(&o.FeatureGates.inputStr, "feature-gates", env.WithDefaultString("FEATURE_GATES", "NodeRepair=false,ReservedCapacity=true,SpotToSpotConsolidation=false,NodeOverlay=false,StaticCapacity=false"), "Optional features can be enabled / disabled using feature gates. Current options are: NodeRepair, ReservedCapacity, SpotToSpotConsolidation, NodeOverlay, and StaticCapacity.")
 }
 
@@ -148,6 +153,9 @@ func (o *Options) Parse(fs *FlagSet, args ...string) error {
 	}
 	if !lo.Contains([]MinValuesPolicy{MinValuesPolicyStrict, MinValuesPolicyBestEffort}, MinValuesPolicy(o.minValuesPolicyRaw)) {
 		return fmt.Errorf("validating cli flags / env vars, invalid MIN_VALUES_POLICY %q", o.minValuesPolicyRaw)
+	}
+	if o.NodeHoldDuration < 0 {
+		return fmt.Errorf("validating cli flags / env vars, invalid NODE_HOLD_DURATION %q, must not be negative", o.NodeHoldDuration)
 	}
 	if o.CPURequests <= 0 {
 		o.CPURequests = 1000

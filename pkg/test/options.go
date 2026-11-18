@@ -50,6 +50,8 @@ type OptionsFields struct {
 	BatchIdleDuration                *time.Duration
 	IgnoreDRARequests                *bool
 	FeatureGates                     FeatureGates
+	NodeHoldLabelKey                 *string
+	NodeHoldDuration                 *time.Duration
 }
 
 type FeatureGates struct {
@@ -88,6 +90,8 @@ func Options(overrides ...OptionsFields) *options.Options {
 		PreferencePolicy:                 lo.FromPtrOr(opts.PreferencePolicy, options.PreferencePolicyRespect),
 		MinValuesPolicy:                  lo.FromPtrOr(opts.MinValuesPolicy, options.MinValuesPolicyStrict),
 		IgnoreDRARequests:                lo.FromPtrOr(opts.IgnoreDRARequests, true),
+		NodeHoldLabelKey:                 lo.FromPtrOr(opts.NodeHoldLabelKey, ""),
+		NodeHoldDuration:                 lo.FromPtrOr(opts.NodeHoldDuration, 30*time.Minute),
 		FeatureGates: options.FeatureGates{
 			NodeRepair:              lo.FromPtrOr(opts.FeatureGates.NodeRepair, false),
 			ReservedCapacity:        lo.FromPtrOr(opts.FeatureGates.ReservedCapacity, true),

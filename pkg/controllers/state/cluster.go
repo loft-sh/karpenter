@@ -654,6 +654,8 @@ func (c *Cluster) newStateFromNodeClaim(nodeClaim *v1.NodeClaim, oldNode *StateN
 		volumeUsage:       oldNode.volumeUsage,
 		markedForDeletion: oldNode.markedForDeletion,
 		nominatedUntil:    oldNode.nominatedUntil,
+		heldUntil:         oldNode.heldUntil,
+		clock:             nodeClock{Clock: c.clock},
 	}
 	// Cleanup the old nodeClaim with its old providerID if its providerID changes
 	// This can happen since nodes don't get created with providerIDs. Rather, CCM picks up the
@@ -702,6 +704,8 @@ func (c *Cluster) newStateFromNode(ctx context.Context, node *corev1.Node, oldNo
 		volumeUsage:       scheduling.NewVolumeUsage(),
 		markedForDeletion: oldNode.markedForDeletion,
 		nominatedUntil:    oldNode.nominatedUntil,
+		heldUntil:         heldUntil(ctx, node, oldNode, c.clock.Now()),
+		clock:             nodeClock{Clock: c.clock},
 	}
 	if err := multierr.Combine(
 		c.populateResourceRequests(ctx, n),

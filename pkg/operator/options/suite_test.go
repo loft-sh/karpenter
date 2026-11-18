@@ -131,6 +131,34 @@ var _ = Describe("Options", func() {
 			}))
 		})
 
+		// loft-sh: node hold options
+		It("should not hold nodes by default", func() {
+			Expect(opts.Parse(fs)).To(Succeed())
+			Expect(opts.NodeHoldLabelKey).To(BeEmpty())
+			Expect(opts.NodeHoldDuration).To(Equal(30 * time.Minute))
+		})
+		It("should read the node hold options from CLI flags", func() {
+			Expect(opts.Parse(fs, "--node-hold-label-key", "example.com/under-repair", "--node-hold-duration", "45m")).To(Succeed())
+			Expect(opts.NodeHoldLabelKey).To(Equal("example.com/under-repair"))
+			Expect(opts.NodeHoldDuration).To(Equal(45 * time.Minute))
+		})
+		It("should read the node hold options from environment variables", func() {
+			os.Setenv("NODE_HOLD_LABEL_KEY", "example.com/under-repair")
+			os.Setenv("NODE_HOLD_DURATION", "10m")
+			defer os.Unsetenv("NODE_HOLD_LABEL_KEY")
+			defer os.Unsetenv("NODE_HOLD_DURATION")
+			fs = &options.FlagSet{
+				FlagSet: flag.NewFlagSet("karpenter", flag.ContinueOnError),
+			}
+			opts.AddFlags(fs)
+			Expect(opts.Parse(fs)).To(Succeed())
+			Expect(opts.NodeHoldLabelKey).To(Equal("example.com/under-repair"))
+			Expect(opts.NodeHoldDuration).To(Equal(10 * time.Minute))
+		})
+		It("should reject a negative node hold duration", func() {
+			Expect(opts.Parse(fs, "--node-hold-duration", "-1m")).ToNot(Succeed())
+		})
+
 		It("shouldn't overwrite CLI flags with environment variables", func() {
 			os.Setenv("LOG_OUTPUT_PATHS", "stdout")
 			os.Setenv("LOG_ERROR_OUTPUT_PATHS", "stderr")
@@ -406,4 +434,6 @@ func expectOptionsMatch(optsA, optsB *options.Options) {
 	Expect(optsA.FeatureGates.StaticCapacity).To(Equal(optsB.FeatureGates.StaticCapacity))
 	Expect(optsA.FeatureGates.SpotToSpotConsolidation).To(Equal(optsB.FeatureGates.SpotToSpotConsolidation))
 	Expect(optsA.IgnoreDRARequests).To(Equal(optsB.IgnoreDRARequests))
+	Expect(optsA.NodeHoldLabelKey).To(Equal(optsB.NodeHoldLabelKey))
+	Expect(optsA.NodeHoldDuration).To(Equal(optsB.NodeHoldDuration))
 }
